@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { deactivateUser } from '@/lib/user-status';
 
 const createTeacherSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -44,4 +46,15 @@ export async function createTeacher(_: unknown, formData: FormData) {
   });
 
   redirect('/admin/teachers');
+}
+
+export async function removeTeacher(formData: FormData) {
+  const session = await auth();
+  if (session?.user.role !== 'ADMIN') return;
+
+  const teacherId = formData.get('teacherId');
+  if (typeof teacherId !== 'string') return;
+
+  await deactivateUser(teacherId);
+  revalidatePath('/admin/teachers');
 }

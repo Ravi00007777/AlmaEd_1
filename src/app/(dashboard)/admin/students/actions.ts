@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { deactivateUser } from '@/lib/user-status';
 
 const createStudentSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -48,4 +50,15 @@ export async function createStudent(_: unknown, formData: FormData) {
   });
 
   redirect('/admin/students');
+}
+
+export async function removeStudent(formData: FormData) {
+  const session = await auth();
+  if (session?.user.role !== 'ADMIN') return;
+
+  const studentId = formData.get('studentId');
+  if (typeof studentId !== 'string') return;
+
+  await deactivateUser(studentId);
+  revalidatePath('/admin/students');
 }

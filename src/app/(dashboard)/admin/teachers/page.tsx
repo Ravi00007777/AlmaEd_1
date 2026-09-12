@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { getInactiveUserIds } from '@/lib/user-status';
+import { removeTeacher } from './actions';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -9,11 +11,14 @@ import { buttonVariants } from '@/components/ui/button';
 import { PlusIcon, UsersIcon } from '@/components/ui/icons';
 
 export default async function TeachersPage() {
-  const teachers = await prisma.user.findMany({
+  const allTeachers = await prisma.user.findMany({
     where: { role: 'TEACHER' },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { teachingBatches: true } } },
   });
+
+  const inactiveIds = await getInactiveUserIds(allTeachers.map((t) => t.id));
+  const teachers = allTeachers.filter((t) => !inactiveIds.has(t.id));
 
   return (
     <div>
@@ -41,6 +46,7 @@ export default async function TeachersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Batches</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -54,6 +60,14 @@ export default async function TeachersPage() {
                     </TableCell>
                     <TableCell>{teacher.email}</TableCell>
                     <TableCell>{teacher._count.teachingBatches}</TableCell>
+                    <TableCell>
+                      <form action={removeTeacher}>
+                        <input type="hidden" name="teacherId" value={teacher.id} />
+                        <button type="submit" className={buttonVariants({ variant: 'danger', size: 'sm' })}>
+                          Remove
+                        </button>
+                      </form>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

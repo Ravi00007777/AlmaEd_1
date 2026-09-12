@@ -4,6 +4,7 @@ import Google from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { authConfig } from '@/lib/auth.config';
+import { isUserActive } from '@/lib/user-status';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -27,6 +28,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
 
+        // Removed accounts (admin's "Remove" action) can't log back in.
+        if (!(await isUserActive(user.id))) return null;
+
         return { id: user.id, name: user.name, email: user.email, role: user.role };
       },
     }),
@@ -46,7 +50,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!user.email) return false;
 
       const existing = await prisma.user.findUnique({ where: { email: user.email } });
-      return existing?.role === 'STUDENT';
+      if (existing?.role !== 'STUDENT') return false;
+      return isUserActive(existing.id);
     },
     jwt: async ({ token, user, account }) => {
       if (user && account?.provider === 'google') {

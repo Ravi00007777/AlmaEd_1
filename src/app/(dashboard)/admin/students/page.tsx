@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { getInactiveUserIds } from '@/lib/user-status';
+import { removeStudent } from './actions';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
@@ -9,11 +11,14 @@ import { buttonVariants } from '@/components/ui/button';
 import { GraduationCapIcon, PlusIcon } from '@/components/ui/icons';
 
 export default async function StudentsPage() {
-  const students = await prisma.user.findMany({
+  const allStudents = await prisma.user.findMany({
     where: { role: 'STUDENT' },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { batchMemberships: true } } },
   });
+
+  const inactiveIds = await getInactiveUserIds(allStudents.map((s) => s.id));
+  const students = allStudents.filter((s) => !inactiveIds.has(s.id));
 
   return (
     <div>
@@ -43,6 +48,7 @@ export default async function StudentsPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Batches</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -57,6 +63,14 @@ export default async function StudentsPage() {
                     <TableCell>{student.email}</TableCell>
                     <TableCell>{student.phone ?? '—'}</TableCell>
                     <TableCell>{student._count.batchMemberships}</TableCell>
+                    <TableCell>
+                      <form action={removeStudent}>
+                        <input type="hidden" name="studentId" value={student.id} />
+                        <button type="submit" className={buttonVariants({ variant: 'danger', size: 'sm' })}>
+                          Remove
+                        </button>
+                      </form>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

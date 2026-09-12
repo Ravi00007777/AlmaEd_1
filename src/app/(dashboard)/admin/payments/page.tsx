@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getInactiveUserIds } from '@/lib/user-status';
 import { NewPaymentForm } from './new-payment-form';
 import { markPaymentStatus } from './actions';
 import { PageHeader } from '@/components/ui/page-header';
@@ -10,7 +11,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { CreditCardIcon } from '@/components/ui/icons';
 
 export default async function PaymentsPage() {
-  const [payments, students, teachers] = await Promise.all([
+  const [payments, allStudents, allTeachers] = await Promise.all([
     prisma.payment.findMany({
       orderBy: { createdAt: 'desc' },
       include: { student: true, teacher: true },
@@ -18,6 +19,12 @@ export default async function PaymentsPage() {
     prisma.user.findMany({ where: { role: 'STUDENT' }, orderBy: { name: 'asc' } }),
     prisma.user.findMany({ where: { role: 'TEACHER' }, orderBy: { name: 'asc' } }),
   ]);
+
+  // Payment history keeps showing removed users normally (untouched) —
+  // only the "record a new payment" dropdowns exclude them.
+  const inactiveIds = await getInactiveUserIds([...allStudents, ...allTeachers].map((u) => u.id));
+  const students = allStudents.filter((s) => !inactiveIds.has(s.id));
+  const teachers = allTeachers.filter((t) => !inactiveIds.has(t.id));
 
   return (
     <div className="flex flex-col gap-6">

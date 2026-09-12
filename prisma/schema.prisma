@@ -42,6 +42,10 @@ model User {
   // Null for a student account created via Google sign-in that has never
   // set a password — credentials login must reject those, not crash.
   passwordHash String?
+  // Soft delete for admin's "Remove" action — a hard delete would either
+  // be blocked by FKs (batches, payments, resources) or destroy real
+  // history. false means: can't log in, hidden from lists/dropdowns.
+  isActive     Boolean  @default(true)
   createdById  String?
   createdBy    User?    @relation("CreatedUsers", fields: [createdById], references: [id])
   createdUsers User[]   @relation("CreatedUsers")

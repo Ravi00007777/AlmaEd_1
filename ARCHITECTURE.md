@@ -82,6 +82,8 @@ Risk to flag now, not a blocker: Supabase's free tier Postgres connection limit 
 
 **Teacher onboarding**: admin creates the teacher's account directly (no public signup) and shares credentials with them out of band.
 
+**Removing a teacher or student**: admin clicks "Remove" on the Teachers/Students list. This is a soft delete (an `isActive` flag, not an actual row deletion) — the account can no longer log in and disappears from every list and selection dropdown, but their historical batches, payments, resources, and doubt threads are left exactly as they were. No reactivate UI yet.
+
 **Scheduling a class**: admin creates a `Batch` (assigns a teacher, adds students, sets the Meet link once, sets the recurring schedule). The platform (or admin, manually for now) generates `Class` rows for upcoming occurrences.
 
 **Joining a class**: student or teacher opens their dashboard, sees the list of upcoming `Class` rows, clicks one, gets redirected to the batch's Meet link. Same link for everyone in that batch.
