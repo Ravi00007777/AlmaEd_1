@@ -6,6 +6,11 @@ import type { NextAuthConfig } from 'next-auth';
 // password, so it uses this config directly instead of the full one in
 // src/lib/auth.ts.
 export const authConfig: NextAuthConfig = {
+  // Vercel is auto-trusted by Auth.js; other hosts (Render, Railway, etc.)
+  // need this explicitly, or every request throws UntrustedHost. Safe here
+  // since NEXTAUTH_URL is always set to our own real deployed domain, not
+  // user-controlled.
+  trustHost: true,
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [],
