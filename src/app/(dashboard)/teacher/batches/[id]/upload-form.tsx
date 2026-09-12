@@ -17,7 +17,7 @@ export function UploadResourceForm({ batchId }: { batchId: string }) {
   }, [state, router]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2">
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
       <input type="hidden" name="batchId" value={batchId} />
       <Field label="Title">
         <Input name="title" placeholder="e.g. Chapter 4 assignment" required className="w-48" />
@@ -33,7 +33,13 @@ export function UploadResourceForm({ batchId }: { batchId: string }) {
         <Input name="dueAt" type="datetime-local" />
       </Field>
       <Field label="File (PDF)">
-        <input type="file" name="file" accept="application/pdf" required />
+        <input
+          type="file"
+          name="file"
+          accept="application/pdf"
+          required
+          className="block text-sm text-slate-600 file:mr-3 file:h-10 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
+        />
       </Field>
       <SubmitButton>Share with batch</SubmitButton>
       <ErrorText>{state?.error}</ErrorText>

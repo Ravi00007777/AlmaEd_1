@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin, RESOURCES_BUCKET } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { sendEmails } from '@/lib/notify';
 
 const uploadSchema = z.object({
   batchId: z.string().min(1),
@@ -70,6 +71,21 @@ export async function uploadResource(_: unknown, formData: FormData) {
   if (parsed.data.dueAt) {
     await prisma.$executeRaw`UPDATE "Resource" SET "dueAt" = ${new Date(parsed.data.dueAt)} WHERE id = ${resource.id}`;
   }
+
+  const members = await prisma.batchStudent.findMany({
+    where: { batchId: parsed.data.batchId },
+    include: { student: { select: { email: true } } },
+  });
+
+  const typeLabel = parsed.data.type.charAt(0) + parsed.data.type.slice(1).toLowerCase();
+  await sendEmails(
+    members.map((m) => m.student),
+    `New ${typeLabel.toLowerCase()} shared: ${parsed.data.title}`,
+    `<p>A new ${typeLabel.toLowerCase()} was shared in <strong>${batch.name}</strong>:</p>
+     <p><strong>${parsed.data.title}</strong></p>
+     ${parsed.data.dueAt ? `<p>Deadline: ${new Date(parsed.data.dueAt).toLocaleString()}</p>` : ''}
+     <p><a href="${publicUrl.publicUrl}">View / download</a></p>`,
+  );
 
   revalidatePath(`/teacher/batches/${parsed.data.batchId}`);
   revalidatePath(`/student/batches/${parsed.data.batchId}`);

@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { Field, Input, SubmitButton, ErrorText } from '@/components/form';
+import { Card, CardContent } from '@/components/ui/card';
+import { GoogleLogoIcon } from '@/components/ui/icons';
 
 export default function LoginPage() {
   const [error, setError] = useState<string>();
@@ -38,31 +41,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
-      <h1 className="text-xl font-semibold">Log in</h1>
-      <form action={handleSubmit} className="flex flex-col gap-3">
-        <Field label="Email">
-          <Input name="email" type="email" required autoComplete="email" />
-        </Field>
-        <Field label="Password">
-          <Input name="password" type="password" required autoComplete="current-password" />
-        </Field>
-        <ErrorText>{error}</ErrorText>
-        <SubmitButton>{loading ? 'Logging in...' : 'Log in'}</SubmitButton>
-      </form>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+      <Link href="/" className="mb-6 text-lg font-bold text-slate-900">
+        Alma<span className="text-indigo-600">Ed</span>
+      </Link>
+      <Card className="w-full max-w-sm">
+        <CardContent className="flex flex-col gap-4">
+          <h1 className="text-xl font-semibold text-slate-900">Log in</h1>
+          <form action={handleSubmit} className="flex flex-col gap-3">
+            <Field label="Email">
+              <Input name="email" type="email" required autoComplete="email" />
+            </Field>
+            <Field label="Password">
+              <Input name="password" type="password" required autoComplete="current-password" />
+            </Field>
+            <ErrorText>{error}</ErrorText>
+            <SubmitButton>{loading ? 'Logging in...' : 'Log in'}</SubmitButton>
+          </form>
 
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <div className="h-px flex-1 bg-gray-200" />
-        or, students only
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <div className="h-px flex-1 bg-slate-200" />
+            or, students only
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
 
-      <button
-        onClick={() => signIn('google', { callbackUrl: '/' })}
-        className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-      >
-        Continue with Google
-      </button>
+          <button
+            onClick={() => signIn('google', { callbackUrl: '/' })}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            <GoogleLogoIcon className="h-4 w-4" />
+            Continue with Google
+          </button>
+        </CardContent>
+      </Card>
     </main>
   );
 }

@@ -45,16 +45,21 @@ export function NewBatchForm({
       </Field>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-gray-700">Students</legend>
-        <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded border border-gray-200 p-2">
+        <legend className="text-sm font-medium text-slate-700">Students</legend>
+        <div className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-slate-300 p-2">
           {students.map((student) => (
-            <label key={student.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="studentIds" value={student.id} />
+            <label key={student.id} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-slate-50">
+              <input
+                type="checkbox"
+                name="studentIds"
+                value={student.id}
+                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
               {student.name} ({student.email})
             </label>
           ))}
           {students.length === 0 && (
-            <p className="text-sm text-gray-500">No students registered yet.</p>
+            <p className="text-sm text-slate-500">No students registered yet.</p>
           )}
         </div>
       </fieldset>

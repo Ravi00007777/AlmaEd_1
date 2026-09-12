@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { createBatch } from '../actions';
 import { NewBatchForm } from './form';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 export default async function NewBatchPage() {
   const [teachers, students] = await Promise.all([
@@ -10,8 +11,14 @@ export default async function NewBatchPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="mb-4 text-lg font-semibold">Create a batch</h1>
-      <NewBatchForm teachers={teachers} students={students} action={createBatch} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Create a batch</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <NewBatchForm teachers={teachers} students={students} action={createBatch} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

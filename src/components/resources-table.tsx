@@ -1,3 +1,8 @@
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ResourceTypeBadge, Badge } from '@/components/ui/badge';
+import { BookOpenIcon, ExternalLinkIcon } from '@/components/ui/icons';
+
 type ResourceRow = {
   id: string;
   type: string;
@@ -9,35 +14,59 @@ type ResourceRow = {
 
 export function ResourcesTable({ resources }: { resources: ResourceRow[] }) {
   if (resources.length === 0) {
-    return <p className="text-sm text-gray-500">Nothing shared yet.</p>;
+    return (
+      <EmptyState
+        icon={<BookOpenIcon className="h-8 w-8" />}
+        title="Nothing shared yet"
+        description="Assignments, tests, and notes will show up here."
+      />
+    );
   }
 
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-gray-200 text-left text-gray-500">
-          <th className="py-2 pr-4">Title</th>
-          <th className="py-2 pr-4">Type</th>
-          <th className="py-2 pr-4">Shared on</th>
-          <th className="py-2">Deadline</th>
-        </tr>
-      </thead>
-      <tbody>
-        {resources.map((resource) => (
-          <tr key={resource.id} className="border-b border-gray-100">
-            <td className="py-2 pr-4">
-              <a href={resource.fileUrl} target="_blank" className="text-blue-600 underline">
-                {resource.title}
-              </a>
-            </td>
-            <td className="py-2 pr-4">{resource.type}</td>
-            <td className="py-2 pr-4">{new Date(resource.createdAt).toLocaleDateString()}</td>
-            <td className="py-2">
-              {resource.dueAt ? new Date(resource.dueAt).toLocaleString() : '—'}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Title</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Shared on</TableHead>
+          <TableHead>Deadline</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {resources.map((resource) => {
+          const overdue = resource.dueAt !== null && new Date(resource.dueAt) < new Date();
+          return (
+            <TableRow key={resource.id}>
+              <TableCell>
+                <a
+                  href={resource.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+                >
+                  {resource.title}
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
+                </a>
+              </TableCell>
+              <TableCell>
+                <ResourceTypeBadge type={resource.type} />
+              </TableCell>
+              <TableCell>{new Date(resource.createdAt).toLocaleDateString()}</TableCell>
+              <TableCell>
+                {resource.dueAt ? (
+                  <span className={`inline-flex items-center gap-2 ${overdue ? 'text-rose-600 font-medium' : ''}`}>
+                    {new Date(resource.dueAt).toLocaleString()}
+                    {overdue && <Badge variant="danger">Overdue</Badge>}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }

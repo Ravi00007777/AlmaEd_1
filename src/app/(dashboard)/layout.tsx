@@ -1,21 +1,12 @@
 import { auth } from '@/lib/auth';
-import { SignOutButton } from '@/components/sign-out-button';
+import { DashboardShell } from '@/components/dashboard-shell';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-        <span className="font-semibold">AlmaEd</span>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>
-            {session?.user?.name} · {session?.user?.role}
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
-      <main className="p-6">{children}</main>
-    </div>
+    <DashboardShell name={session?.user?.name ?? ''} role={session?.user?.role ?? 'STUDENT'}>
+      {children}
+    </DashboardShell>
   );
 }

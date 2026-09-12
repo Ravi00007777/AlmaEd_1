@@ -18,7 +18,7 @@ export function AddClassForm({ batchId }: { batchId: string }) {
   }, [state, router]);
 
   return (
-    <form action={formAction} className="flex items-end gap-2">
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
       <input type="hidden" name="batchId" value={batchId} />
       <Input name="scheduledAt" type="datetime-local" required />
       <SubmitButton>Schedule class</SubmitButton>

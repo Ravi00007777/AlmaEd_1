@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { sendEmails } from '@/lib/notify';
 
 async function requireAdmin() {
   const session = await auth();
@@ -46,6 +47,19 @@ export async function createBatch(_: unknown, formData: FormData) {
       students: { create: studentIds.map((studentId) => ({ studentId })) },
     },
   });
+
+  const recipients = await prisma.user.findMany({
+    where: { id: { in: [teacherId, ...studentIds] } },
+    select: { email: true },
+  });
+
+  await sendEmails(
+    recipients,
+    `You've been added to ${name}`,
+    `<p>You've been added to the batch <strong>${name}</strong>${scheduleNote ? ` (${scheduleNote})` : ''}.</p>
+     <p>Join every class for this batch using the same link:</p>
+     <p><a href="${meetLink}">${meetLink}</a></p>`,
+  );
 
   redirect(`/admin/batches/${batch.id}`);
 }

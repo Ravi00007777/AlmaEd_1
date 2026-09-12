@@ -1,18 +1,18 @@
 'use client';
 
 import { useFormState } from 'react-dom';
-import { createTeacher } from '../actions';
+import { createStudent } from '../actions';
 import { Field, Input, SubmitButton, ErrorText } from '@/components/form';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-export default function NewTeacherPage() {
-  const [state, formAction] = useFormState(createTeacher, undefined);
+export default function NewStudentPage() {
+  const [state, formAction] = useFormState(createStudent, undefined);
 
   return (
     <div className="mx-auto max-w-sm">
       <Card>
         <CardHeader>
-          <CardTitle>Add a teacher</CardTitle>
+          <CardTitle>Add a student</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="flex flex-col gap-3">
@@ -25,11 +25,15 @@ export default function NewTeacherPage() {
             <Field label="Phone (optional)">
               <Input name="phone" type="tel" />
             </Field>
-            <Field label="Temporary password">
-              <Input name="password" type="password" required minLength={8} />
+            <Field label="Password (optional)">
+              <Input name="password" type="password" minLength={8} />
             </Field>
+            <p className="-mt-1 text-xs text-slate-500">
+              Leave blank if this student will only sign in with &ldquo;Continue with Google&rdquo; using the
+              same email.
+            </p>
             <ErrorText>{state?.error}</ErrorText>
-            <SubmitButton>Create teacher account</SubmitButton>
+            <SubmitButton>Create student account</SubmitButton>
           </form>
         </CardContent>
       </Card>

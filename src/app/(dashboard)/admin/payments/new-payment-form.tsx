@@ -19,7 +19,7 @@ export function NewPaymentForm({ students, teachers }: { students: Person[]; tea
   }, [state, router]);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-2">
+    <form action={formAction} className="flex flex-wrap items-end gap-3">
       <Field label="Student">
         <Select name="studentId" required defaultValue="">
           <option value="" disabled>

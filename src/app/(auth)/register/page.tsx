@@ -1,49 +1,25 @@
-'use client';
-
-import { useFormState } from 'react-dom';
-import { signIn } from 'next-auth/react';
-import { registerStudent } from './actions';
-import { Field, Input, SubmitButton, ErrorText } from '@/components/form';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
 
 export default function RegisterPage() {
-  const [state, formAction] = useFormState(registerStudent, undefined);
-
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-8">
-      <h1 className="text-xl font-semibold">Register as a student</h1>
-      <p className="text-sm text-gray-600">
-        This account can also be used by your parent to log in and see your schedule.
-      </p>
-
-      <button
-        onClick={() => signIn('google', { callbackUrl: '/' })}
-        className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-      >
-        Continue with Google
-      </button>
-
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <div className="h-px flex-1 bg-gray-200" />
-        or, with email and password
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
-
-      <form action={formAction} className="flex flex-col gap-3">
-        <Field label="Name">
-          <Input name="name" required autoComplete="name" />
-        </Field>
-        <Field label="Email">
-          <Input name="email" type="email" required autoComplete="email" />
-        </Field>
-        <Field label="Phone (optional)">
-          <Input name="phone" type="tel" autoComplete="tel" />
-        </Field>
-        <Field label="Password">
-          <Input name="password" type="password" required minLength={8} autoComplete="new-password" />
-        </Field>
-        <ErrorText>{state?.error}</ErrorText>
-        <SubmitButton>Register</SubmitButton>
-      </form>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+      <Link href="/" className="mb-6 text-lg font-bold text-slate-900">
+        Alma<span className="text-indigo-600">Ed</span>
+      </Link>
+      <Card className="w-full max-w-sm">
+        <CardContent className="flex flex-col items-center gap-4 text-center">
+          <h1 className="text-xl font-semibold text-slate-900">Accounts are added by admin</h1>
+          <p className="text-sm text-slate-500">
+            AlmaEd doesn&rsquo;t have public sign-up. Ask your school admin to add you as a student, then log in
+            below with the email and password (or Google account) they set up for you.
+          </p>
+          <Link href="/login" className={buttonVariants({ className: 'w-full' })}>
+            Go to log in
+          </Link>
+        </CardContent>
+      </Card>
     </main>
   );
 }

@@ -37,20 +37,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    // Google sign-in is students-only: teachers/admin are vetted and
-    // created by admin, so a Google account matching their email must not
-    // grant access. A new email via Google auto-registers as a student.
+    // All accounts (teacher and student alike) are created by admin — there
+    // is no public signup. Google sign-in is just an alternative login for
+    // an existing student account matching that email; an unrecognized
+    // email or a teacher/admin email must be rejected, never auto-created.
     signIn: async ({ user, account }) => {
       if (account?.provider !== 'google') return true;
       if (!user.email) return false;
 
       const existing = await prisma.user.findUnique({ where: { email: user.email } });
-      if (existing) return existing.role === 'STUDENT';
-
-      await prisma.user.create({
-        data: { name: user.name ?? user.email, email: user.email, role: 'STUDENT' },
-      });
-      return true;
+      return existing?.role === 'STUDENT';
     },
     jwt: async ({ token, user, account }) => {
       if (user && account?.provider === 'google') {

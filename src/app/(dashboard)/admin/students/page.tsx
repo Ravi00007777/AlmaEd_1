@@ -1,4 +1,12 @@
+import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { PageHeader } from '@/components/ui/page-header';
+import { Card } from '@/components/ui/card';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Avatar } from '@/components/ui/avatar';
+import { buttonVariants } from '@/components/ui/button';
+import { GraduationCapIcon, PlusIcon } from '@/components/ui/icons';
 
 export default async function StudentsPage() {
   const students = await prisma.user.findMany({
@@ -9,37 +17,53 @@ export default async function StudentsPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-lg font-semibold">Students</h1>
-      <p className="mb-4 text-sm text-gray-600">
-        Students self-register. Assign them to a batch from the batch page.
-      </p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-left text-gray-500">
-            <th className="py-2">Name</th>
-            <th className="py-2">Email</th>
-            <th className="py-2">Phone</th>
-            <th className="py-2">Batches</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <tr key={student.id} className="border-b border-gray-100">
-              <td className="py-2">{student.name}</td>
-              <td className="py-2">{student.email}</td>
-              <td className="py-2">{student.phone ?? '—'}</td>
-              <td className="py-2">{student._count.batchMemberships}</td>
-            </tr>
-          ))}
-          {students.length === 0 && (
-            <tr>
-              <td colSpan={4} className="py-4 text-center text-gray-500">
-                No students yet.
-              </td>
-            </tr>
+      <PageHeader
+        title="Students"
+        description="Added by admin only. Assign them to a batch from the batch page."
+        action={
+          <Link href="/admin/students/new" className={buttonVariants({ size: 'sm' })}>
+            <PlusIcon className="h-4 w-4" />
+            Add student
+          </Link>
+        }
+      />
+      <Card>
+        <div className="p-5">
+          {students.length === 0 ? (
+            <EmptyState
+              icon={<GraduationCapIcon className="h-8 w-8" />}
+              title="No students yet"
+              description="Add a student to get started."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Batches</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={student.name} />
+                        <span className="font-medium text-slate-900">{student.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{student.email}</TableCell>
+                    <TableCell>{student.phone ?? '—'}</TableCell>
+                    <TableCell>{student._count.batchMemberships}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </tbody>
-      </table>
+        </div>
+      </Card>
     </div>
   );
 }

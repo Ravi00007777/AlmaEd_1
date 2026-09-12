@@ -55,6 +55,8 @@ model User {
   paymentsAsTeacher Payment[]       @relation("PaymentTeacher")
   recordedPayments  Payment[]       @relation("PaymentRecordedBy")
   notifications     Notification[]
+  doubtThreads      DoubtMessage[]  @relation("DoubtThreadStudent")
+  sentDoubtMessages DoubtMessage[]  @relation("DoubtMessageSender")
 
   @@index([role])
 }
@@ -72,9 +74,10 @@ model Batch {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  students  BatchStudent[]
-  classes   Class[]
-  resources Resource[]
+  students      BatchStudent[]
+  classes       Class[]
+  resources     Resource[]
+  doubtMessages DoubtMessage[]
 
   @@index([teacherId])
 }
@@ -153,4 +156,24 @@ model Notification {
   sentAt    DateTime @default(now())
 
   @@index([userId, sentAt])
+}
+
+// A private doubt thread between one student and their batch's teacher —
+// not visible to other students in the batch. `studentId` identifies whose
+// thread a message belongs to; `senderId` identifies who actually wrote it
+// (the student asking, or the teacher replying), so both sides' messages
+// live in the same thread.
+model DoubtMessage {
+  id        String   @id @default(cuid())
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation("DoubtThreadStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("DoubtMessageSender", fields: [senderId], references: [id])
+  body      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  @@index([batchId, studentId, createdAt])
 }
