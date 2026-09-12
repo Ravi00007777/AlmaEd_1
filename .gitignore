@@ -41,8 +41,6 @@ next-env.d.ts
 *.swo
 
 # Prisma
-prisma/migrations/
-
 # Logs
 logs
 *.log

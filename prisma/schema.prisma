@@ -1,896 +1,156 @@
-// TutorConnect - Prisma Schema
-// Online Personal Tutoring Marketplace
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// ============================================
-// ENUMS
-// ============================================
-
-enum UserRole {
-  STUDENT
-  PARENT
-  TEACHER
+enum Role {
   ADMIN
-}
-
-enum UserStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  DELETED
-}
-
-enum TeacherVerificationStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-  SUSPENDED
+  TEACHER
+  STUDENT
 }
 
 enum ClassStatus {
   SCHEDULED
-  IN_PROGRESS
   COMPLETED
   CANCELLED
-  NO_SHOW
-  RESCHEDULED
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-  EXPIRED
+enum ResourceType {
+  ASSIGNMENT
+  TEST
+  NOTE
 }
 
 enum PaymentStatus {
   PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REFUNDED
-  PARTIALLY_REFUNDED
+  PAID
 }
 
-enum SubscriptionStatus {
-  ACTIVE
-  PAUSED
-  CANCELLED
-  EXPIRED
-  PAST_DUE
-}
-
-enum AssignmentStatus {
-  ASSIGNED
-  IN_PROGRESS
-  SUBMITTED
-  GRADED
-  OVERDUE
-  CANCELLED
-}
-
-enum DemoStatus {
-  REQUESTED
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-  EXPIRED
-}
-
-enum NotificationChannel {
-  IN_APP
-  EMAIL
-  WHATSAPP
-  SMS
-}
-
-// ============================================
-// CORE MODELS
-// ============================================
-
+// A student's account is also used by their parent to log in — there is
+// no separate parent role. See ARCHITECTURE.md "Domain glossary".
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  emailVerified     DateTime?
-  passwordHash      String?
-  role              UserRole  @default(STUDENT)
-  status            UserStatus @default(PENDING)
-  name              String
-  phone             String?
-  phoneVerified     DateTime?
-  timezone          String    @default("Asia/Kolkata")
-  avatarUrl         String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  lastLoginAt       DateTime?
-
-  // Relations
-  student           Student?
-  teacher           Teacher?
-  parent            Parent?
-  accounts          Account[]
-  sessions          Session[]
-  notifications     Notification[]
-  sentMessages      Message[]   @relation("SentMessages")
-  receivedMessages  Message[]   @relation("ReceivedMessages")
-  auditLogs         AuditLog[]
-  fileUploads       FileUpload[]
-
-  @@index([email])
-  @@index([role, status])
-  @@map("users")
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-model Session {
   id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role
+  name         String
+  email        String   @unique
+  phone        String?
+  // Null for a student account created via Google sign-in that has never
+  // set a password — credentials login must reject those, not crash.
+  passwordHash String?
+  createdById  String?
+  createdBy    User?    @relation("CreatedUsers", fields: [createdById], references: [id])
+  createdUsers User[]   @relation("CreatedUsers")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  @@index([userId])
-  @@map("sessions")
+  teachingBatches   Batch[]         @relation("TeacherBatches")
+  batchMemberships  BatchStudent[]
+  uploadedResources Resource[]      @relation("ResourceUploader")
+  paymentsAsStudent Payment[]       @relation("PaymentStudent")
+  paymentsAsTeacher Payment[]       @relation("PaymentTeacher")
+  recordedPayments  Payment[]       @relation("PaymentRecordedBy")
+  notifications     Notification[]
+
+  @@index([role])
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+// One teacher, one or more students, one shared recurring Meet link.
+// Size 1 = a 1:1 class. See ARCHITECTURE.md "Domain glossary" for why
+// this isn't a separate "Enrollment" table.
+model Batch {
+  id           String   @id @default(cuid())
+  name         String
+  teacherId    String
+  teacher      User     @relation("TeacherBatches", fields: [teacherId], references: [id])
+  meetLink     String
+  scheduleNote String? // free-text schedule description for v1, e.g. "Tue/Thu 5:00pm IST"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
+  students  BatchStudent[]
+  classes   Class[]
+  resources Resource[]
 
-// ============================================
-// STUDENT/PARENT MODELS
-// ============================================
-
-model Student {
-  id                    String    @id @default(cuid())
-  userId                String    @unique
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Academic Info
-  grade                 String
-  board                 String
-  school                String?
-  currentLevel          String?
-  targetGoal            String?
-  examDate              DateTime?
-
-  // Preferences
-  preferredLanguage     String    @default("English")
-  preferredDuration     Int       @default(60)
-  preferredDays         String[]  @default([])
-  preferredTimeStart    String?
-  preferredTimeEnd      String?
-  monthlyBudget         Decimal?  @db.Decimal(10, 2)
-  learningPreferences   String?   @db.Text
-
-  // Relations
-  parentId              String?
-  parent                Parent?   @relation(fields: [parentId], references: [id])
-  syllabus              Syllabus?
-  studyPlan             StudyPlan?
-  availability          StudentAvailability[]
-  teacherAssignments    TeacherStudentAssignment[]
-  classes               Class[]   @relation("StudentClasses")
-  demoClasses           DemoClass[] @relation("StudentDemoClasses")
-  assignments           AssignmentSubmission[]
-  attendance            Attendance[] @relation("StudentAttendance")
-  payments              Payment[]
-  subscriptions         Subscription[]
-  progress              StudentProgress[]
-  reviews               Review[]
-
-  @@index([grade, board])
-  @@index([parentId])
-  @@map("students")
-}
-
-model Parent {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  students        Student[]
-  notifications   Notification[] @relation("ParentNotifications")
-  payments        Payment[]
-
-  @@index([userId])
-  @@map("parents")
-}
-
-model StudentAvailability {
-  id          String   @id @default(cuid())
-  studentId   String
-  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  dayOfWeek   Int
-  startTime   String
-  endTime     String
-  isRecurring Boolean  @default(true)
-  validFrom   DateTime @default(now())
-  validUntil  DateTime?
-  timezone    String   @default("Asia/Kolkata")
-
-  @@unique([studentId, dayOfWeek, startTime, endTime])
-  @@index([studentId])
-  @@map("student_availability")
-}
-
-// ============================================
-// TEACHER MODELS
-// ============================================
-
-model Teacher {
-  id                      String                    @id @default(cuid())
-  userId                  String                    @unique
-  user                    User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Profile
-  bio                     String?                   @db.Text
-  education               String?
-  university              String?
-  qualifications          String[]                  @default([])
-  experienceYears         Int                       @default(0)
-  subjects                String[]                  @default([])
-  grades                  String[]                  @default([])
-  boards                  String[]                  @default([])
-  languages               String[]                  @default(["English"])
-  teachingStyle           String?                   @db.Text
-  demoVideoUrl            String?
-  hourlyRate              Decimal                   @db.Decimal(10, 2)
-  monthlyRate             Decimal?                  @db.Decimal(10, 2)
-
-  // Verification
-  verificationStatus      TeacherVerificationStatus @default(PENDING)
-  verifiedAt              DateTime?
-  verifiedBy              String?
-  verificationNotes       String?
-  documents               String[]                  @default([])
-
-  // Stats
-  totalStudents           Int                       @default(0)
-  activeStudents          Int                       @default(0)
-  totalClasses            Int                       @default(0)
-  rating                  Decimal                   @default(0) @db.Decimal(3, 2)
-  reviewCount             Int                       @default(0)
-
-  // Settings
-  maxClassesPerDay        Int                       @default(4)
-  preferredDuration       Int                       @default(60)
-  bufferMinutes           Int                       @default(15)
-  autoAcceptDemos         Boolean                   @default(false)
-
-  // Relations
-  availability            TeacherAvailability[]
-  teacherAssignments      TeacherStudentAssignment[]
-  classes                 Class[]                   @relation("TeacherClasses")
-  demoClasses             DemoClass[]               @relation("TeacherDemoClasses")
-  assignments             Assignment[]
-  earnings                TeacherEarning[]
-  payouts                 TeacherPayout[]
-  reviews                 Review[]
-  availabilityExceptions  TeacherAvailabilityException[]
-  subscriptions           Subscription[]            @relation("TeacherSubscriptions")
-
-  @@index([verificationStatus])
-  @@index([subjects])
-  @@index([rating])
-  @@map("teachers")
-}
-
-model TeacherAvailability {
-  id            String   @id @default(cuid())
-  teacherId     String
-  teacher       Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  dayOfWeek     Int
-  startTime     String
-  endTime       String
-  isRecurring   Boolean  @default(true)
-  validFrom     DateTime @default(now())
-  validUntil    DateTime?
-  timezone      String   @default("Asia/Kolkata")
-
-  @@unique([teacherId, dayOfWeek, startTime, endTime])
   @@index([teacherId])
-  @@map("teacher_availability")
 }
 
-model TeacherAvailabilityException {
-  id          String   @id @default(cuid())
-  teacherId   String
-  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  date        DateTime
-  startTime   String?
-  endTime     String?
-  reason      String?
-  createdAt   DateTime @default(now())
+model BatchStudent {
+  id        String   @id @default(cuid())
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-  @@index([teacherId, date])
-  @@map("teacher_availability_exceptions")
-}
-
-// ============================================
-// SYLLABUS & STUDY PLAN
-// ============================================
-
-model Syllabus {
-  id              String    @id @default(cuid())
-  studentId       String    @unique
-  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  originalFiles   String[]  @default([])
-  extractedText   String?   @db.Text
-  parsedData      Json?
-  subjects        Json
-  examDates       Json?
-  aiAnalysis      Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  processedAt     DateTime?
-  processingStatus String   @default("PENDING")
-  topics          SyllabusTopic[]
-
+  @@unique([batchId, studentId])
   @@index([studentId])
-  @@map("syllabi")
 }
 
-model SyllabusTopic {
-  id          String   @id @default(cuid())
-  syllabusId  String
-  syllabus    Syllabus @relation(fields: [syllabusId], references: [id], onDelete: Cascade)
-  subject     String
-  chapter     String
-  topic       String
-  subtopic    String?
-  difficulty  Int      @default(1)
-  estimatedHours Decimal @default(1) @db.Decimal(4, 1)
-  order       Int      @default(0)
-  isCompleted Boolean  @default(false)
-  completedAt DateTime?
-
-  @@index([syllabusId, subject, chapter])
-  @@map("syllabus_topics")
-}
-
-model StudyPlan {
-  id            String    @id @default(cuid())
-  studentId     String    @unique
-  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  weeks         Json
-  generatedAt   DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  version       Int       @default(1)
-  isActive      Boolean   @default(true)
-
-  @@index([studentId])
-  @@map("study_plans")
-}
-
-// ============================================
-// TEACHER-STUDENT ASSIGNMENT
-// ============================================
-
-model TeacherStudentAssignment {
-  id            String   @id @default(cuid())
-  teacherId     String
-  teacher       Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  studentId     String
-  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  subject       String
-  status        String   @default("ACTIVE")
-  startedAt     DateTime @default(now())
-  endedAt       DateTime?
-  matchScore    Decimal? @db.Decimal(5, 2)
-  matchReason   String?  @db.Text
-  assignedBy    String?
-  classes       Class[]        @relation("ClassAssignment")
-  assignments   Assignment[]   @relation("AssignmentAssignment")
-
-  @@unique([teacherId, studentId, subject])
-  @@index([teacherId, status])
-  @@index([studentId, status])
-  @@map("teacher_student_assignments")
-}
-
-// ============================================
-// DEMO CLASS SYSTEM
-// ============================================
-
-model DemoClass {
-  id              String     @id @default(cuid())
-  studentId       String
-  student         Student    @relation("StudentDemoClasses", fields: [studentId], references: [id], onDelete: Cascade)
-  teacherId       String
-  teacher         Teacher    @relation("TeacherDemoClasses", fields: [teacherId], references: [id], onDelete: Cascade)
-  subject         String
-  status          DemoStatus @default(REQUESTED)
-  scheduledAt     DateTime?
-  duration        Int        @default(30)
-  googleCalendarEventId String?
-  googleMeetLink  String?
-  timezone        String     @default("Asia/Kolkata")
-
-  teacherFeedback DemoTeacherFeedback?
-  studentFeedback DemoStudentFeedback?
-  compatibilityScore Decimal? @db.Decimal(5, 2)
-
-  requestedAt     DateTime   @default(now())
-  confirmedAt     DateTime?
-  completedAt     DateTime?
-  cancelledAt     DateTime?
-  cancelReason    String?
-
-  @@index([studentId, status])
-  @@index([teacherId, status])
-  @@index([scheduledAt])
-  @@map("demo_classes")
-}
-
-model DemoTeacherFeedback {
-  id              String   @id @default(cuid())
-  demoClassId     String   @unique
-  demoClass       DemoClass @relation(fields: [demoClassId], references: [id], onDelete: Cascade)
-  studentLevel    String
-  strengths       String[] @default([])
-  weaknesses      String[] @default([])
-  recommendedFrequency Int?
-  recommendedCurriculum String? @db.Text
-  compatibilityScore Int
-  comments        String?  @db.Text
-  createdAt       DateTime @default(now())
-
-  @@map("demo_teacher_feedback")
-}
-
-model DemoStudentFeedback {
-  id                 String   @id @default(cuid())
-  demoClassId        String   @unique
-  demoClass          DemoClass @relation(fields: [demoClassId], references: [id], onDelete: Cascade)
-  teachingQuality    Int
-  communication      Int
-  explanationQuality Int
-  comfortLevel       Int
-  overallRating      Int
-  wouldRecommend     Boolean
-  comments           String?  @db.Text
-  createdAt          DateTime @default(now())
-
-  @@map("demo_student_feedback")
-}
-
-// ============================================
-// CLASSES & SCHEDULING
-// ============================================
-
+// One scheduled occurrence of a Batch's recurring session.
 model Class {
-  id                    String       @id @default(cuid())
-  teacherId             String
-  teacher               Teacher      @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
-  studentId             String
-  student               Student      @relation("StudentClasses", fields: [studentId], references: [id], onDelete: Cascade)
-  assignmentId          String?
-  assignment            TeacherStudentAssignment? @relation("ClassAssignment", fields: [assignmentId], references: [id])
+  id          String      @id @default(cuid())
+  batchId     String
+  batch       Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  scheduledAt DateTime
+  status      ClassStatus @default(SCHEDULED)
+  reminderSentAt DateTime?
+  createdAt   DateTime    @default(now())
 
-  subject               String
-  topic                 String?
-  status                ClassStatus  @default(SCHEDULED)
-  scheduledAt           DateTime
-  duration              Int          @default(60)
-  actualStartAt         DateTime?
-  actualEndAt           DateTime?
-  timezone              String       @default("Asia/Kolkata")
-
-  googleCalendarEventId String?      @unique
-  googleMeetLink        String?
-  meetRecordingUrl      String?
-
-  isRecurring           Boolean      @default(false)
-  recurrenceRule        String?
-  recurrenceEndDate     DateTime?
-  parentClassId         String?
-  parentClass           Class?       @relation("RescheduledClasses", fields: [parentClassId], references: [id])
-  rescheduledClasses    Class[]      @relation("RescheduledClasses")
-
-  teacherNotes          String?      @db.Text
-  studentNotes          String?      @db.Text
-  attendance            Attendance?  @relation("ClassAttendance")
-  earnings              TeacherEarning[] @relation("ClassEarnings")
-  reviews               Review[]
-  messages              Message[]    @relation("ClassMessages")
-
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-  completedAt           DateTime?
-
-  @@index([teacherId, scheduledAt, status])
-  @@index([studentId, scheduledAt, status])
-  @@index([assignmentId])
-  @@index([googleCalendarEventId])
-  @@map("classes")
+  @@index([batchId, scheduledAt])
 }
 
-model Attendance {
-  id          String   @id @default(cuid())
-  classId     String   @unique
-  class       Class    @relation("ClassAttendance", fields: [classId], references: [id], onDelete: Cascade)
-  studentId   String
-  student     Student  @relation("StudentAttendance", fields: [studentId], references: [id])
-  teacherId   String
-  status      String   @default("PRESENT")
-  markedAt    DateTime @default(now())
-  markedBy    String
-  notes       String?
+// A file a teacher shares with a batch: assignment, test, or note.
+// One entity with a `type`, not separate tables — see ARCHITECTURE.md.
+model Resource {
+  id         String       @id @default(cuid())
+  batchId    String
+  batch      Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy User         @relation("ResourceUploader", fields: [uploadedById], references: [id])
+  type       ResourceType
+  title      String
+  fileUrl    String
+  // Deadline for an ASSIGNMENT/TEST to be completed by — optional since a
+  // NOTE has no deadline, and even assignments/tests aren't required to set
+  // one.
+  dueAt      DateTime?
+  createdAt  DateTime     @default(now())
 
-  @@index([studentId, markedAt])
-  @@index([teacherId, markedAt])
-  @@map("attendance")
+  @@index([batchId, createdAt])
 }
 
-// ============================================
-// ASSIGNMENTS
-// ============================================
-
-model Assignment {
-  id              String            @id @default(cuid())
-  teacherId       String
-  teacher         Teacher           @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  assignmentId    String?
-  assignment      TeacherStudentAssignment? @relation("AssignmentAssignment", fields: [assignmentId], references: [id])
-
-  title           String
-  description     String?           @db.Text
-  subject         String
-  topic           String?
-  questions       Json
-  attachments     String[]          @default([])
-  maxMarks        Int               @default(100)
-  difficulty      Int               @default(1)
-  assignedAt      DateTime          @default(now())
-  dueAt           DateTime
-  allowLateSubmit Boolean           @default(false)
-  latePenalty     Int               @default(0)
-
-  submissions     AssignmentSubmission[]
-
-  @@index([teacherId, dueAt])
-  @@index([assignmentId, dueAt])
-  @@map("assignments")
-}
-
-model AssignmentSubmission {
-  id              String               @id @default(cuid())
-  assignmentId    String
-  assignment      Assignment           @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  studentId       String
-  student         Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  content         String?              @db.Text
-  attachments     String[]             @default([])
-  submittedAt     DateTime?
-  status          AssignmentStatus     @default(ASSIGNED)
-
-  marksObtained   Int?
-  gradedAt        DateTime?
-  gradedBy        String?
-  feedback        String?              @db.Text
-  correctedFiles  String[]             @default([])
-
-  @@unique([assignmentId, studentId])
-  @@index([studentId, status])
-  @@index([assignmentId, status])
-  @@map("assignment_submissions")
-}
-
-// ============================================
-// PROGRESS TRACKING
-// ============================================
-
-model StudentProgress {
-  id              String   @id @default(cuid())
-  studentId       String
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  subject         String
-  topic           String?
-
-  classesAttended Int      @default(0)
-  classesTotal    Int      @default(0)
-  assignmentsCompleted Int @default(0)
-  assignmentsTotal Int     @default(0)
-  averageScore    Decimal? @db.Decimal(5, 2)
-  weakTopics      String[] @default([])
-  strongTopics    String[] @default([])
-
-  aiInsights      Json?
-  lastAnalyzedAt  DateTime?
-
-  updatedAt       DateTime @updatedAt
-
-  @@unique([studentId, subject, topic])
-  @@index([studentId, subject])
-  @@map("student_progress")
-}
-
-// ============================================
-// PAYMENTS & SUBSCRIPTIONS
-// ============================================
-
-model Subscription {
-  id                  String               @id @default(cuid())
-  studentId           String
-  student             Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  teacherId           String?
-  teacher             Teacher?             @relation("TeacherSubscriptions", fields: [teacherId], references: [id])
-
-  planType            String
-  subject             String
-  classesPerWeek      Int
-  durationMinutes     Int
-  price               Decimal              @db.Decimal(10, 2)
-  commissionPercent   Decimal              @default(15) @db.Decimal(5, 2)
-  teacherEarning      Decimal              @db.Decimal(10, 2)
-
-  status              SubscriptionStatus   @default(ACTIVE)
-  currentPeriodStart  DateTime             @default(now())
-  currentPeriodEnd    DateTime
-  nextBillingDate     DateTime
-  cancelledAt         DateTime?
-  cancelReason        String?
-
-  razorpayPlanId      String?
-  razorpaySubscriptionId String?
-
-  payments            Payment[]
-  earnings            TeacherEarning[] @relation("SubscriptionEarnings")
-
-  @@index([studentId, status])
-  @@index([teacherId, status])
-  @@index([nextBillingDate])
-  @@map("subscriptions")
-}
-
+// Tracked, not processed: money moves off-platform, admin marks status.
 model Payment {
-  id                  String         @id @default(cuid())
-  studentId           String
-  student             Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  parentId            String?
-  parent              Parent?        @relation(fields: [parentId], references: [id])
-  subscriptionId      String?
-  subscription        Subscription?  @relation(fields: [subscriptionId], references: [id])
+  id           String        @id @default(cuid())
+  studentId    String
+  student      User          @relation("PaymentStudent", fields: [studentId], references: [id])
+  teacherId    String
+  teacher      User          @relation("PaymentTeacher", fields: [teacherId], references: [id])
+  amount       Decimal       @db.Decimal(10, 2)
+  status       PaymentStatus @default(PENDING)
+  note         String?
+  recordedById String
+  recordedBy   User          @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  amount              Decimal        @db.Decimal(10, 2)
-  commissionAmount    Decimal        @db.Decimal(10, 2)
-  teacherAmount       Decimal        @db.Decimal(10, 2)
-  commissionPercent   Decimal        @db.Decimal(5, 2)
-  currency            String         @default("INR")
-  status              PaymentStatus  @default(PENDING)
-  paymentMethod       String?
-
-  razorpayOrderId     String?        @unique
-  razorpayPaymentId   String?        @unique
-  razorpaySignature   String?
-
-  refundAmount        Decimal        @default(0) @db.Decimal(10, 2)
-  refundedAt          DateTime?
-  refundReason        String?
-
-  paidAt              DateTime?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  earnings            TeacherEarning[] @relation("PaymentEarnings")
-
-  @@index([studentId, status, createdAt])
-  @@index([razorpayOrderId])
-  @@index([razorpayPaymentId])
-  @@index([subscriptionId])
-  @@map("payments")
-}
-
-model TeacherEarning {
-  id              String    @id @default(cuid())
-  teacherId       String
-  teacher         Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  classId         String?
-  class           Class?    @relation("ClassEarnings", fields: [classId], references: [id])
-  subscriptionId  String?
-  subscription    Subscription? @relation("SubscriptionEarnings", fields: [subscriptionId], references: [id])
-  paymentId       String?
-  payment         Payment?  @relation("PaymentEarnings", fields: [paymentId], references: [id])
-  payoutId        String?
-  payout          TeacherPayout? @relation(fields: [payoutId], references: [id])
-
-  grossAmount     Decimal   @db.Decimal(10, 2)
-  commissionAmount Decimal  @db.Decimal(10, 2)
-  netAmount       Decimal   @db.Decimal(10, 2)
-  commissionPercent Decimal @db.Decimal(5, 2)
-  status          String    @default("PENDING")
-  earnedAt        DateTime  @default(now())
-  paidOutAt       DateTime?
-
-  @@index([teacherId, status, earnedAt])
-  @@index([paymentId])
-  @@map("teacher_earnings")
-}
-
-model TeacherPayout {
-  id              String    @id @default(cuid())
-  teacherId       String
-  teacher         Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  amount          Decimal   @db.Decimal(10, 2)
-  status          String    @default("PENDING")
-  method          String
-  bankDetails     Json?
-  razorpayPayoutId String?  @unique
-  initiatedAt     DateTime  @default(now())
-  completedAt     DateTime?
-  failureReason   String?
-
-  earnings        TeacherEarning[]
-
-  @@index([teacherId, status])
-  @@index([razorpayPayoutId])
-  @@map("teacher_payouts")
-}
-
-// ============================================
-// REVIEWS & RATINGS
-// ============================================
-
-model Review {
-  id          String   @id @default(cuid())
-  teacherId   String
-  teacher     Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  studentId   String
-  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id])
-
-  rating      Int
-  title       String?
-  comment     String?  @db.Text
-  isAnonymous Boolean  @default(false)
-  isVerified  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([teacherId, studentId, classId])
-  @@index([teacherId, rating])
   @@index([studentId])
-  @@map("reviews")
+  @@index([teacherId])
 }
-
-// ============================================
-// NOTIFICATIONS & COMMUNICATION
-// ============================================
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        String
-  title       String
-  message     String   @db.Text
-  data        Json?
-  isRead      Boolean  @default(false)
-  readAt      DateTime?
-  channels    String[] @default(["IN_APP"])
-  sentAt      DateTime @default(now())
-  parentId    String?
-  parent      Parent?  @relation("ParentNotifications", fields: [parentId], references: [id])
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // e.g. "CLASS_REMINDER", "RESOURCE_SHARED"
+  message   String
+  channel   String   @default("EMAIL")
+  sentAt    DateTime @default(now())
 
-  @@index([userId, isRead, sentAt])
-  @@map("notifications")
-}
-
-model Message {
-  id              String   @id @default(cuid())
-  senderId        String
-  sender          User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId      String
-  receiver        User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  classId         String?
-  class           Class?   @relation("ClassMessages", fields: [classId], references: [id])
-  content         String   @db.Text
-  attachments     String[] @default([])
-  isRead          Boolean  @default(false)
-  readAt          DateTime?
-  createdAt       DateTime @default(now())
-
-  @@index([senderId, receiverId, createdAt])
-  @@index([classId, createdAt])
-  @@map("messages")
-}
-
-// ============================================
-// ADMIN & SYSTEM
-// ============================================
-
-model PlatformSettings {
-  id                      String   @id @default("singleton")
-  commissionPercent       Decimal  @default(15) @db.Decimal(5, 2)
-  minCommissionPercent    Decimal  @default(5) @db.Decimal(5, 2)
-  maxCommissionPercent    Decimal  @default(30) @db.Decimal(5, 2)
-  razorpayKeyId           String?
-  razorpayKeySecret       String?
-  googleClientId          String?
-  googleClientSecret      String?
-  openaiApiKey            String?
-  smtpHost                String?
-  smtpPort                Int?
-  smtpUser                String?
-  smtpPass                String?
-  whatsappApiKey          String?
-  maintenanceMode         Boolean  @default(false)
-  allowTeacherRegistration Boolean @default(true)
-  allowStudentRegistration Boolean @default(true)
-  updatedAt               DateTime @updatedAt
-  updatedBy               String?
-
-  @@map("platform_settings")
-}
-
-model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  action      String
-  entity      String
-  entityId    String
-  oldData     Json?
-  newData     Json?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@index([entity, entityId])
-  @@index([action, createdAt])
-  @@map("audit_logs")
-}
-
-model FileUpload {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  url         String
-  type        String
-  mimeType    String
-  size        Int
-  originalName String
-  metadata    Json?
-  createdAt   DateTime @default(now())
-
-  @@index([userId, type, createdAt])
-  @@map("file_uploads")
+  @@index([userId, sentAt])
 }

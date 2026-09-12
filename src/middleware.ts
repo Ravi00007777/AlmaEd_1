@@ -1,91 +1,53 @@
-import { auth } from '@/lib/auth/auth-options';
+import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
+import { authConfig } from '@/lib/auth.config';
 
-const publicRoutes = ['/', '/login', '/register', '/teachers', '/teachers/[id]', '/api/auth', '/api/google'];
-const authRoutes = ['/login', '/register'];
+const { auth } = NextAuth(authConfig);
 
-const roleRoutes: Record<string, string[]> = {
-  STUDENT: ['/student', '/api/student'],
-  TEACHER: ['/teacher', '/api/teacher'],
-  ADMIN: ['/admin', '/api/admin'],
-  PARENT: ['/parent', '/api/parent'],
+const roleHome: Record<string, string> = {
+  ADMIN: '/admin',
+  TEACHER: '/teacher',
+  STUDENT: '/student',
 };
+
+const publicRoutes = ['/', '/login', '/register'];
 
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const userRole = req.auth?.user?.role;
+  const role = req.auth?.user?.role;
 
-  // Check if route is public
-  const isPublicRoute = publicRoutes.some((route) => {
-    if (route.includes('[')) {
-      // Handle dynamic routes
-      const regex = new RegExp(`^${route.replace(/\[.*?\]/g, '[^/]+')}$`);
-      return regex.test(nextUrl.pathname);
-    }
-    return nextUrl.pathname === route || nextUrl.pathname.startsWith(route + '/');
-  });
+  const isPublicRoute = publicRoutes.includes(nextUrl.pathname);
+  // '/' included here too: a logged-in user has no reason to see the
+  // marketing landing page — send them straight to their dashboard.
+  const isRouteToLeaveOnLogin =
+    nextUrl.pathname === '/' || nextUrl.pathname === '/login' || nextUrl.pathname === '/register';
 
-  // Check if route is an auth route
-  const isAuthRoute = authRoutes.some((route) => nextUrl.pathname.startsWith(route));
-
-  // Redirect logged in users from auth pages
-  if (isLoggedIn && isAuthRoute) {
-    if (!userRole) {
-      return NextResponse.redirect(new URL('/student/dashboard', nextUrl));
-    }
-    const dashboardUrl = getDashboardUrl(userRole);
-    return NextResponse.redirect(new URL(dashboardUrl, nextUrl));
-  }
-
-  // Redirect non-logged in users from protected routes
   if (!isLoggedIn && !isPublicRoute) {
-    const loginUrl = new URL('/login', nextUrl);
-    loginUrl.searchParams.set('callbackUrl', nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL('/login', nextUrl));
   }
 
-  // Check role-based access
-  if (isLoggedIn && userRole) {
-    const allowedRoutes = roleRoutes[userRole] || [];
-    const isAllowed = allowedRoutes.some((route) => nextUrl.pathname.startsWith(route));
-    const isPublicApi = nextUrl.pathname.startsWith('/api/') && 
-      ['/api/auth', '/api/google', '/api/webhooks'].some(p => nextUrl.pathname.startsWith(p));
+  if (isLoggedIn && isRouteToLeaveOnLogin && role) {
+    return NextResponse.redirect(new URL(roleHome[role], nextUrl));
+  }
 
-    if (!isAllowed && !isPublicApi && !nextUrl.pathname.startsWith('/api/')) {
-      // Redirect to appropriate dashboard
-      const dashboardUrl = getDashboardUrl(userRole);
-      return NextResponse.redirect(new URL(dashboardUrl, nextUrl));
+  if (isLoggedIn && role) {
+    const ownSection = `/${role.toLowerCase()}`;
+    const isAdminRoute = nextUrl.pathname.startsWith('/admin');
+    const isTeacherRoute = nextUrl.pathname.startsWith('/teacher');
+    const isStudentRoute = nextUrl.pathname.startsWith('/student');
+
+    if (
+      (isAdminRoute || isTeacherRoute || isStudentRoute) &&
+      !nextUrl.pathname.startsWith(ownSection)
+    ) {
+      return NextResponse.redirect(new URL(roleHome[role], nextUrl));
     }
   }
 
   return NextResponse.next();
 });
 
-function getDashboardUrl(role: string): string {
-  switch (role) {
-    case 'STUDENT':
-      return '/student/dashboard';
-    case 'TEACHER':
-      return '/teacher/dashboard';
-    case 'ADMIN':
-      return '/admin/dashboard';
-    case 'PARENT':
-      return '/parent/dashboard';
-    default:
-      return '/student/dashboard';
-  }
-}
-
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
-  ],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
