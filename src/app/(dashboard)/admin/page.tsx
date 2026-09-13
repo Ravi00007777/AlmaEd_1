@@ -1,16 +1,21 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { getInactiveUserIds } from '@/lib/user-status';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { UsersIcon, GraduationCapIcon, BookOpenIcon, CreditCardIcon } from '@/components/ui/icons';
 
 export default async function AdminHomePage() {
-  const [teacherCount, studentCount, batchCount, pendingPayments] = await Promise.all([
-    prisma.user.count({ where: { role: 'TEACHER' } }),
-    prisma.user.count({ where: { role: 'STUDENT' } }),
+  const [allTeacherIds, allStudentIds, batchCount, pendingPayments] = await Promise.all([
+    prisma.user.findMany({ where: { role: 'TEACHER' }, select: { id: true } }),
+    prisma.user.findMany({ where: { role: 'STUDENT' }, select: { id: true } }),
     prisma.batch.count(),
     prisma.payment.count({ where: { status: 'PENDING' } }),
   ]);
+
+  const inactiveIds = await getInactiveUserIds([...allTeacherIds, ...allStudentIds].map((u) => u.id));
+  const teacherCount = allTeacherIds.filter((t) => !inactiveIds.has(t.id)).length;
+  const studentCount = allStudentIds.filter((s) => !inactiveIds.has(s.id)).length;
 
   const cards = [
     { label: 'Teachers', value: teacherCount, href: '/admin/teachers', icon: UsersIcon, tint: 'bg-indigo-50 text-indigo-600' },
